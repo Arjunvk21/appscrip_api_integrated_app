@@ -12,10 +12,10 @@ class TaskRepository {
 
   Future<void> updateTask(hive_model task) async {
     final box = await Hive.openBox<hive_model>('taskBox');
-    await box.put(task.id, task);
+    await box.put(task.id, task as hive_model);
   }
 
-  Future<void> deleteTask(int id) async {
+  Future<void> deleteTask( id) async {
     final box = await Hive.openBox<hive_model>('taskBox');
     await box.delete(id);
   }

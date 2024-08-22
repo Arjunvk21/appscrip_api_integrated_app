@@ -77,7 +77,49 @@ class TaskProvider with ChangeNotifier {
     }
   }
 
+  // Future<void> updateTask(TaskModel task, hive_model hiveTask) async {
+  //   try {
+  //     // Log the API id and localId for debugging
+  //     print('API ID: ${task.id}, Local ID: ${task.localId}');
 
+  //     // Construct the URI for updating the task on the server
+  //     final uri = Uri.parse(
+  //         'https://jsonplaceholder.typicode.com/todos/${task.id}');
+  //     final requestBody = json.encode(task.toJson());
+
+  //     // Debugging log
+  //     print('Updating task at $uri with body: $requestBody');
+
+  //     // Perform the remote update via HTTP PUT
+  //     final response = await http.put(
+  //       uri,
+  //       headers: {'Content-Type': 'application/json'},
+  //       body: requestBody,
+  //     );
+  //     print('Response status code: ${response.statusCode}');
+  //     print('Response body: ${response.body}');
+
+  //     if (response.statusCode == 200) {
+  //       print('Task updated successfully');
+
+  //       // Find the task in the local list using localId
+  //       int index = _tasks.indexWhere((t) => t.localId == task.localId);
+  //       if (index != -1) {
+  //         // Update the local task
+  //         _tasks[index] = task;
+  //         await _taskRepository.updateTask(task);
+  //         notifyListeners();
+  //       } else {
+  //         print('Task with localId ${task.localId} not found');
+  //       }
+  //     } else {
+  //       print('Failed to update task: ${response.body}');
+  //       throw Exception('Failed to update task');
+  //     }
+  //   } catch (e) {
+  //     print('Error updating task: $e');
+  //   }
+  // }
   Future<void> updateTask(TaskModel task, hive_model hiveTask) async {
     try {
       // Log the API id and localId for debugging
@@ -108,7 +150,7 @@ class TaskProvider with ChangeNotifier {
         if (index != -1) {
           // Update the local task
           _tasks[index] = task;
-          await _taskRepository.updateTask(hiveTask);
+          await _taskRepository.updateTask(hiveTask); // Update Hive task
           notifyListeners();
         } else {
           print('Task with localId ${task.localId} not found');
@@ -122,27 +164,59 @@ class TaskProvider with ChangeNotifier {
     }
   }
 
-  Future<void> deleteTask(id) async {
-    try {
-      print('Deleting task with id: $id');
+  // Future<void> deleteTask(id) async {
+  //   try {
+  //     print('Deleting task with id: $id');
 
-      // Perform the remote deletion
-      final response = await http.delete(
-        Uri.parse('https://jsonplaceholder.typicode.com/todos/$id'),
+  //     // Perform the remote deletion
+  //     final response = await http.delete(
+  //       Uri.parse('https://jsonplaceholder.typicode.com/todos/$id'),
+  //     );
+
+  //     if (response.statusCode == 200 || response.statusCode == 204) {
+  //       print('Tasks before deletion: $_tasks');
+
+  //       // Remove the task from the local list
+  //       _tasks.removeWhere((task) => task.id == id);
+
+  //       print('Tasks after deletion: $_tasks');
+
+  //       notifyListeners();
+  //     } else {
+  //       print('Failed to delete task: ${response.body}');
+  //       throw Exception('Failed to delete task');
+  //     }
+  //   } catch (e) {
+  //     print('Error deleting task: $e');
+  //   }
+  // }
+
+  Future<void> deleteTask(String localId) async {
+    try {
+      // Find the task to delete using the localId
+      final taskToDelete = _tasks.firstWhere(
+        (t) => t.localId == localId,
+        // orElse: () => null,  // Safely handle cases where the task is not found
       );
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        print('Tasks before deletion: $_tasks');
+      // Check if the task is found and has a valid API ID
+      if (taskToDelete != null && taskToDelete.id != null) {
+        final uri = Uri.parse(
+            'https://jsonplaceholder.typicode.com/todos/${taskToDelete.id}');
+        final response = await http.delete(uri);
 
-        // Remove the task from the local list
-        _tasks.removeWhere((task) => task.id == id);
-
-        print('Tasks after deletion: $_tasks');
-
-        notifyListeners();
+        if (response.statusCode == 200 || response.statusCode == 204) {
+          // Successfully deleted task from API
+          _tasks.removeWhere((t) => t.localId == localId);
+          await _taskRepository.deleteTask(localId); // Delete from Hive
+          notifyListeners();
+        } else {
+          print('Failed to delete task: ${response.body}');
+          throw Exception('Failed to delete task');
+        }
       } else {
-        print('Failed to delete task: ${response.body}');
-        throw Exception('Failed to delete task');
+        print(
+            'Task with localId $localId does not have a valid API ID or was not found');
       }
     } catch (e) {
       print('Error deleting task: $e');

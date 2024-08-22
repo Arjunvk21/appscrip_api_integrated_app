@@ -68,7 +68,7 @@ class TaskManagementPage extends StatelessWidget {
                         color: Colors.white70,
                       ),
                       onPressed: () async {
-                        await taskProvider.deleteTask(task.id);
+                        await taskProvider.deleteTask(task.localId);
                       },
                     ),
                     onTap: () async {
