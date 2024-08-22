@@ -1,5 +1,8 @@
+import 'package:uuid/uuid.dart';
+
 class TaskModel {
-  int id;
+  String localId; 
+  int? id;
   String title;
   String description;
   DateTime dueDate;
@@ -8,30 +11,32 @@ class TaskModel {
   String assignedUser;
 
   TaskModel({
-    required this.id,
+    this.id,
+    required this.localId,
     required this.title,
-    required this.description,
+    this.description = '',
     required this.dueDate,
     required this.priority,
     required this.status,
-    required this.assignedUser,
+    this.assignedUser = '',
   });
 
   factory TaskModel.fromJson(Map<String, dynamic> json) {
     return TaskModel(
+      localId: Uuid().v4(),
       id: json['id'],
-      title: json['title'],
-      description: json['description'],
+      title: json['title'] ?? '',
+      description: json['description'] ?? '',
       dueDate: DateTime.parse(json['due_date']),
-      priority: json['priority'],
-      status: json['status'],
-      assignedUser: json['assigned_user'],
+      priority: json['priority'] ?? 'Medium',
+      status: json['status'] ?? 'To-Do',
+      assignedUser: json['assigned_user'] ?? '',
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
+      'id':id,
       'title': title,
       'description': description,
       'due_date': dueDate.toIso8601String(),

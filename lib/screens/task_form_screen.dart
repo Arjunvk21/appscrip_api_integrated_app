@@ -4,6 +4,7 @@ import 'package:appscrip_task_management_app/provider/task_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 
 class TaskManagementPage extends StatelessWidget {
   const TaskManagementPage({super.key});
@@ -25,6 +26,7 @@ class TaskManagementPage extends StatelessWidget {
             itemCount: taskProvider.tasks.length,
             itemBuilder: (context, index) {
               final task = taskProvider.tasks[index];
+              print('-----------${task.id}');
 
               return Padding(
                 padding:
@@ -50,7 +52,7 @@ class TaskManagementPage extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Assigned User: ${task.assignedUser}',
+                            'Assigned User: ${task.title}',
                             style: const TextStyle(color: Colors.white70),
                           ),
                           Text(
@@ -143,16 +145,29 @@ class _TaskEditPageState extends State<TaskEditPage> {
   @override
   void initState() {
     super.initState();
-    _title = widget.task?.title ?? '';
-    _description = widget.task?.description ?? '';
-    _dueDate = widget.task?.dueDate ?? DateTime.now();
-    _priority = widget.task?.priority ?? 'Medium';
-    _status = widget.task?.status ?? 'To-Do';
-    _assignedUser = widget.task?.assignedUser ?? '';
+    if (widget.task != null) {
+      _title = widget.task!.title;
+      _description = widget.task!.description;
+      _dueDate = widget.task!.dueDate;
+      _priority = widget.task!.priority;
+      _status = widget.task!.status;
+      _assignedUser = widget.task!.assignedUser;
+    } else {
+      _title = '';
+      _description = '';
+      _dueDate = DateTime.now();
+      _priority = 'Medium';
+      _status = 'To-Do';
+      _assignedUser = '';
+    }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<TaskProvider>(context, listen: false).fetchUsers();
     });
+  }
+
+  int generateHiveKey() {
+    return DateTime.now().millisecondsSinceEpoch.hashCode;
   }
 
   @override
@@ -231,8 +246,8 @@ class _TaskEditPageState extends State<TaskEditPage> {
                     builder: (context, child) {
                       return Theme(
                         data: Theme.of(context).copyWith(
-                          colorScheme: ColorScheme.light(
-                            primary: const Color(0xFF6200EE),
+                          colorScheme: const ColorScheme.light(
+                            primary: Color(0xFF6200EE),
                             onPrimary: Colors.white,
                             surface: Colors.white,
                             onSurface: Colors.black,
@@ -337,13 +352,11 @@ class _TaskEditPageState extends State<TaskEditPage> {
               const SizedBox(height: 32),
               ElevatedButton(
                 onPressed: () {
-                  int generateHiveKey() {
-                    return DateTime.now().millisecondsSinceEpoch % 4294967296;
-                  }
-
                   if (_formKey.currentState!.validate()) {
                     _formKey.currentState!.save();
+
                     final newTask = TaskModel(
+                      localId: Uuid().v4(),
                       id: widget.task?.id ?? generateHiveKey(),
                       title: _title,
                       description: _description,
@@ -353,6 +366,7 @@ class _TaskEditPageState extends State<TaskEditPage> {
                       assignedUser: _assignedUser ?? '',
                     );
                     final hiveNewTask = hive_model(
+                        localId: Uuid().v4(),
                         id: widget.task?.id ?? generateHiveKey(),
                         title: _title,
                         description: _description,

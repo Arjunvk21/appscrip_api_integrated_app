@@ -18,8 +18,11 @@ class hive_model extends HiveObject {
   late final String status;
   @HiveField(6)
   late final String assignedUser;
+  @HiveField(7)
+  late final String localId;
 
   hive_model({
+    required this.localId,
     required this.id,
     required this.title,
     required this.description,

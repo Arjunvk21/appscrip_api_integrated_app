@@ -6,7 +6,11 @@ import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+import 'package:uuid/uuid.dart';
+
 class TaskProvider with ChangeNotifier {
+  var uuid = const Uuid();
+
   final TaskRepository _taskRepository = TaskRepository();
   List<hive_model> _hivetasks = [];
   Box<hive_model> hiveBox = Hive.box<hive_model>('taskBox');
@@ -19,27 +23,20 @@ class TaskProvider with ChangeNotifier {
 
   List<Map<String, dynamic>> get users => _users;
 
-  Stream<void> fetchTasks() async* {
-    final hiveTasks = hiveBox.values.toList();
-    _hivetasks = await _taskRepository.fetchTasks();
-    final response =
-        await http.get(Uri.parse('https://jsonplaceholder.typicode.com/todos'));
-    if (response.statusCode == 200) {
-      // _tasks = data.map((task) => TaskModel.fromJson(task)).toList();
-      _tasks = hiveTasks.map((hiveTask) {
-        return TaskModel(
-          id: hiveTask.id,
-          title: hiveTask.title,
-          description: hiveTask.description,
-          dueDate: hiveTask.dueDate,
-          priority: hiveTask.priority,
-          status: hiveTask.status,
-          assignedUser: hiveTask.assignedUser,
-        );
-      }).toList();
-      notifyListeners();
-    } else {
-      throw Exception('Failed to load tasks');
+  Future<void> fetchTasks() async {
+    try {
+      final response = await http
+          .get(Uri.parse('https://jsonplaceholder.typicode.com/todos'));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        _tasks = data.map((task) => TaskModel.fromJson(task)).toList();
+        _hivetasks = await _taskRepository.fetchTasks();
+        notifyListeners();
+      } else {
+        throw Exception('Failed to load tasks');
+      }
+    } catch (e) {
+      print('Error fetching tasks: $e');
     }
   }
 
@@ -54,9 +51,9 @@ class TaskProvider with ChangeNotifier {
     }
   }
 
-  Future<void> createTask(TaskModel task, hive_model hivetask) async {
+  Future<void> createTask(TaskModel task, hive_model hiveTask) async {
     try {
-      // Attempt to create task on the server
+      // Perform the remote creation
       final response = await http.post(
         Uri.parse('https://jsonplaceholder.typicode.com/todos'),
         headers: {'Content-Type': 'application/json'},
@@ -64,35 +61,37 @@ class TaskProvider with ChangeNotifier {
       );
 
       if (response.statusCode == 201) {
-        // If server creation is successful, update the local state
+        final responseData = json.decode(response.body);
+        // If server creation is successful, add to local state and Hive
         _tasks.add(TaskModel.fromJson(json.decode(response.body)));
-        await _taskRepository.createTask(hivetask);
+        task.id = responseData['id'];
+        await _taskRepository.createTask(hiveTask); // Save to Hive
         notifyListeners();
+        print('Task Created: ${task.localId}');
       } else {
+        print('Failed to create task on server: ${response.body}');
         throw Exception('Failed to create task on server');
       }
     } catch (e) {
-      // Handle errors during server request
       print('Error creating task: $e');
     }
-
-    ///update task
   }
 
-  Future<void> updateTask(TaskModel task, hive_model hivetask) async {
+
+  Future<void> updateTask(TaskModel task, hive_model hiveTask) async {
     try {
-      print('-------------${task.id}');
-      final uri = Uri.parse('https://jsonplaceholder.typicode.com/todos/1');
-      final requestBody = json.encode({
-        'id': task.id,
-        'title': task.title,
-        'completed': task.status == 'Done' ? true : false,
-      });
+      // Log the API id and localId for debugging
+      print('API ID: ${task.id}, Local ID: ${task.localId}');
+
+      // Construct the URI for updating the task on the server
+      final uri =
+          Uri.parse('https://jsonplaceholder.typicode.com/todos/${task.id}');
+      final requestBody = json.encode(task.toJson());
 
       // Debugging log
       print('Updating task at $uri with body: $requestBody');
 
-      // Perform the remote update
+      // Perform the remote update via HTTP PUT
       final response = await http.put(
         uri,
         headers: {'Content-Type': 'application/json'},
@@ -104,11 +103,15 @@ class TaskProvider with ChangeNotifier {
       if (response.statusCode == 200) {
         print('Task updated successfully');
 
-        int index = _tasks.indexWhere((t) => t.id == task.id);
+        // Find the task in the local list using localId
+        int index = _tasks.indexWhere((t) => t.localId == task.localId);
         if (index != -1) {
+          // Update the local task
           _tasks[index] = task;
-          await _taskRepository.updateTask(hivetask);
+          await _taskRepository.updateTask(hiveTask);
           notifyListeners();
+        } else {
+          print('Task with localId ${task.localId} not found');
         }
       } else {
         print('Failed to update task: ${response.body}');
@@ -119,7 +122,7 @@ class TaskProvider with ChangeNotifier {
     }
   }
 
-  Future<void> deleteTask(int id) async {
+  Future<void> deleteTask(id) async {
     try {
       print('Deleting task with id: $id');
 

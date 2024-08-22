@@ -24,6 +24,7 @@ class hivemodelAdapter extends TypeAdapter<hive_model> {
       priority: fields[4] as String,
       status: fields[5] as String,
       assignedUser: fields[6] as String,
+      localId: fields[7] as String,
     );
   }
 
